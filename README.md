@@ -68,13 +68,27 @@ terraform destroy
 | Variable | Description |
 |----------|-------------|
 | `prefix` | Name added to every deployed resource |
-| `admin_source_cidr` | Source address allowed to reach SSH and the exposed service. Restrict it to your own public IP, for example `203.0.113.10/32` |
+| `admin_source_cidr` | Required source address allowed to reach SSH and the exposed service by default. Restrict it to your own public IP, for example `203.0.113.10/32` |
+| `allow_internet_exposure` | Explicit opt-in to allow world-open ingress for vulnerable demo services |
+| `owner` | Required tag/label value identifying who owns the deployment |
+| `expires_on` | Required tag/label value (`YYYY-MM-DD`) for cleanup deadline tracking |
 | `os_image` | `ubuntu-26.04` or `debian-13` (default `debian-13`). More images can be added to `os_images` in `main.tf` |
 | `install_forticnapp_agent` | Install the FortiCNAPP Linux agent from the `packages.lacework.net` APT repository (amd64 and arm64 only) |
 | `forticnapp_access_token` | Agent access token, required when the agent is installed. Prefer `export TF_VAR_forticnapp_access_token=<token>` over writing it to a file |
 | `forticnapp_server_url` | FortiCNAPP server URL for your region (default `https://api.fra.lacework.net`). Empty means auto-discover |
 
 Network ranges, VM sizes, tags and the pinned package versions have defaults and are documented in `terraform.tfvars.example`.
+
+## Safety
+
+These templates are intentionally vulnerable and should only be used for short-lived testing.
+
+- `admin_source_cidr` is required and must not be world-open (`0.0.0.0/0`, `::/0` or `*`) unless you explicitly set `allow_internet_exposure = true`.
+- Service ingress for PHP2Shell and CVE-2026-119618 is restricted to `admin_source_cidr` by default; world-open exposure is an explicit opt-in.
+- Every deployment includes default safety tags/labels (`purpose = intentionally-vulnerable-demo`, `owner`, `expires_on`). Set `owner` and `expires_on` to identify accountability and cleanup deadlines.
+- Every template prints a safety warning with the public IP and a `terraform destroy` reminder.
+
+Always deploy in a dedicated, isolated account/subscription/project with no access to production resources.
 
 ## Support
 
