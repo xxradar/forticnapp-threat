@@ -24,7 +24,7 @@ provider "aws" {
   region = var.region
 
   default_tags {
-    tags = var.tags
+    tags = local.common_tags
   }
 }
 
@@ -43,7 +43,37 @@ variable "key_name" {
 
 variable "admin_source_cidr" {
   description = "Source CIDR allowed to reach SSH (22). Restrict this to your own public IP/CIDR."
-  default     = "0.0.0.0/0"
+
+  validation {
+    condition     = var.allow_internet_exposure || !contains(["0.0.0.0/0", "::/0", "*"], trimspace(var.admin_source_cidr))
+    error_message = "admin_source_cidr cannot be world-open (0.0.0.0/0, ::/0, or *) unless allow_internet_exposure = true."
+  }
+}
+
+variable "allow_internet_exposure" {
+  description = "Set to true to allow world-open ingress for intentionally vulnerable demo services."
+  type        = bool
+  default     = false
+}
+
+variable "owner" {
+  description = "Owner of this intentionally vulnerable deployment (team or person)."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.owner)) > 0
+    error_message = "owner must not be empty."
+  }
+}
+
+variable "expires_on" {
+  description = "Expiration date for this demo deployment in YYYY-MM-DD format."
+  type        = string
+
+  validation {
+    condition     = can(regex("^\d{4}-\d{2}-\d{2}$", var.expires_on))
+    error_message = "expires_on must use YYYY-MM-DD format."
+  }
 }
 
 ##############################################################################################################
@@ -155,10 +185,16 @@ variable "arch" {
 }
 
 variable "tags" {
-  type = map(string)
-  default = {
-    project = "node-vm"
-  }
+  type    = map(string)
+  default = {}
+}
+
+locals {
+  common_tags = merge({
+    purpose    = "intentionally-vulnerable-demo"
+    owner      = var.owner
+    expires_on = var.expires_on
+  }, var.tags)
 }
 
 ##############################################################################################################
@@ -582,6 +618,15 @@ output "demo_url" {
 output "verify_command" {
   description = "Read the build report left by the cloud-init script (available once cloud-init has finished)"
   value       = "ssh -i <private key> ${local.image.ssh_user}@${aws_eip.lnxpip.public_ip} 'cat /var/log/node-report.txt'"
+}
+
+output "safety_warning" {
+  value = <<-EOT
+WARNING: This deployment is intentionally vulnerable.
+Public IP: ${aws_eip.lnxpip.public_ip}
+Service exposure to the internet requires allow_internet_exposure = true.
+Destroy this environment immediately after testing: terraform destroy.
+EOT
 }
 
 output "forticnapp_agent_installed" {

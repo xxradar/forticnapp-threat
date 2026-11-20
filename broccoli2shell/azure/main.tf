@@ -50,7 +50,37 @@ variable "ssh_public_key_file" {
 
 variable "admin_source_cidr" {
   description = "Source address prefix allowed to reach SSH (22). Restrict this to your own public IP/CIDR."
-  default     = "*"
+
+  validation {
+    condition     = var.allow_internet_exposure || !contains(["0.0.0.0/0", "::/0", "*"], trimspace(var.admin_source_cidr))
+    error_message = "admin_source_cidr cannot be world-open (0.0.0.0/0, ::/0, or *) unless allow_internet_exposure = true."
+  }
+}
+
+variable "allow_internet_exposure" {
+  description = "Set to true to allow world-open ingress for intentionally vulnerable demo services."
+  type        = bool
+  default     = false
+}
+
+variable "owner" {
+  description = "Owner of this intentionally vulnerable deployment (team or person)."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.owner)) > 0
+    error_message = "owner must not be empty."
+  }
+}
+
+variable "expires_on" {
+  description = "Expiration date for this demo deployment in YYYY-MM-DD format."
+  type        = string
+
+  validation {
+    condition     = can(regex("^\d{4}-\d{2}-\d{2}$", var.expires_on))
+    error_message = "expires_on must use YYYY-MM-DD format."
+  }
 }
 
 ##############################################################################################################
@@ -183,10 +213,16 @@ variable "vm_size" {
 }
 
 variable "tags" {
-  type = map(string)
-  default = {
-    project = "node-vm"
-  }
+  type    = map(string)
+  default = {}
+}
+
+locals {
+  common_tags = merge({
+    purpose    = "intentionally-vulnerable-demo"
+    owner      = var.owner
+    expires_on = var.expires_on
+  }, var.tags)
 }
 
 ##############################################################################################################
@@ -394,7 +430,7 @@ locals {
 resource "azurerm_resource_group" "resourcegroup" {
   name     = "${var.prefix}-rg"
   location = var.location
-  tags     = var.tags
+  tags     = local.common_tags
 }
 
 resource "azurerm_virtual_network" "vnet" {
@@ -402,7 +438,7 @@ resource "azurerm_virtual_network" "vnet" {
   address_space       = [var.vnet]
   location            = azurerm_resource_group.resourcegroup.location
   resource_group_name = azurerm_resource_group.resourcegroup.name
-  tags                = var.tags
+  tags                = local.common_tags
 }
 
 resource "azurerm_subnet" "subnet" {
@@ -420,7 +456,7 @@ resource "azurerm_network_security_group" "lnxnsg" {
   name                = "${var.prefix}-lnx-nsg"
   location            = var.location
   resource_group_name = azurerm_resource_group.resourcegroup.name
-  tags                = var.tags
+  tags                = local.common_tags
 }
 
 resource "azurerm_network_security_rule" "lnxnsgallowsshin" {
@@ -458,7 +494,7 @@ resource "azurerm_public_ip" "lnxpip" {
   allocation_method   = "Static"
   sku                 = "Standard"
   domain_name_label   = format("%s-%s", lower(var.prefix), "lnx-pip")
-  tags                = var.tags
+  tags                = local.common_tags
 }
 
 resource "azurerm_network_interface" "lnxifc" {
@@ -466,7 +502,7 @@ resource "azurerm_network_interface" "lnxifc" {
   location                       = azurerm_resource_group.resourcegroup.location
   resource_group_name            = azurerm_resource_group.resourcegroup.name
   accelerated_networking_enabled = false
-  tags                           = var.tags
+  tags                           = local.common_tags
 
   ip_configuration {
     name                          = "ipconfig1"
@@ -514,7 +550,7 @@ resource "azurerm_linux_virtual_machine" "lnxvm" {
     public_key = file(pathexpand(var.ssh_public_key_file))
   }
 
-  tags = var.tags
+  tags = local.common_tags
 
   lifecycle {
     precondition {
@@ -548,6 +584,15 @@ output "lnx_fqdn" {
 
 output "lnx_private_ip_address" {
   value = azurerm_network_interface.lnxifc.private_ip_address
+}
+
+output "safety_warning" {
+  value = <<-EOT
+WARNING: This deployment is intentionally vulnerable.
+Public IP: ${azurerm_public_ip.lnxpip.ip_address}
+Service exposure to the internet requires allow_internet_exposure = true.
+Destroy this environment immediately after testing: terraform destroy.
+EOT
 }
 
 output "forticnapp_agent_installed" {

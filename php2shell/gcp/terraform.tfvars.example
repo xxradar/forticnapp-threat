@@ -1,3 +1,6 @@
+# !!! INTENTIONALLY VULNERABLE DEMO SAFETY !!!
+# Restrict admin_source_cidr to trusted addresses, keep allow_internet_exposure = false unless explicitly required, and destroy resources after testing.
+
 # Copy to terraform.tfvars and adjust. Used by main.tf
 
 # --- Required ---
@@ -12,6 +15,11 @@ ssh_public_key_file = "~/.ssh/id_rsa.pub"
 
 # Restrict SSH to your own public IP, e.g. "203.0.113.10/32"
 admin_source_cidr = "203.0.113.10/32"
+allow_internet_exposure = false
+
+# Required safety ownership metadata
+owner      = "your-name-or-team"
+expires_on = "2030-01-31"
 
 # --- OS image: "ubuntu-26.04" (PHP 8.5) or "debian-13" (PHP 8.4); see os_images in main.tf ---
 os_image = "debian-13"
