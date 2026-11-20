@@ -4,6 +4,37 @@ Terraform deployment templates that build intentionally vulnerable Linux hosts i
 
 **WARNING:** These templates deploy software with known, exploitable vulnerabilities and expose it to the internet. Only use them in a dedicated, disposable account, subscription or project, restrict access with `admin_source_cidr`, and destroy the environment when you are done.
 
+## What is Infrastructure as Code?
+
+Infrastructure as Code (IaC) means defining networks, virtual machines, permissions and other infrastructure in machine-readable configuration files instead of creating and changing resources manually in a cloud console or with ad hoc scripts.
+
+Teams use IaC because it makes infrastructure:
+
+- **Repeatable:** the same configuration can create consistent environments.
+- **Reviewable:** changes are visible in version control and can go through normal code review.
+- **Automatable:** deployments can be included in scripts and CI/CD pipelines.
+- **Documented:** the configuration describes how the environment is assembled.
+
+For example, this abbreviated Terraform configuration declares an AWS virtual machine:
+
+```hcl
+variable "demo_name" {
+  type    = string
+  default = "forticnapp-demo"
+}
+
+resource "aws_instance" "demo" {
+  ami           = "ami-0123456789abcdef0" # Replace with a valid AMI in your region
+  instance_type = "t3.micro"
+
+  tags = {
+    Name = var.demo_name
+  }
+}
+```
+
+Terraform compares this desired state with the deployed state. `terraform plan` previews changes, and `terraform apply` creates or updates the resources. This repository applies the same approach across AWS, Azure and Google Cloud: each scenario and cloud folder contains a Terraform template that you can review, deploy and remove.
+
 ## Deployment
 
 Each scenario is available as a separate Terraform template per cloud. All of them deploy a single Linux VM in a new network, selectable between Ubuntu 26.04 and Debian 13 (`os_image`), and can optionally install the FortiCNAPP Linux agent (`install_forticnapp_agent`).
