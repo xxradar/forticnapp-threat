@@ -1,6 +1,6 @@
 ##############################################################################################################
 #
-# Ubuntu / Debian VM with a pinned PHP version (OS image selectable via terraform.tfvars)
+# Ubuntu / Debian VM with a fixed PHP version (OS image selectable via terraform.tfvars)
 # Terraform deployment template for Microsoft Azure
 #
 ##############################################################################################################
@@ -66,7 +66,7 @@ variable "os_images" {
     offer       = string
     sku         = string
     php_series  = string # PHP major.minor shipped by this image, e.g. "8.5"
-    php_version = string # default exact package version to pin for this image
+    php_version = string # default exact fixed package version for this image
   }))
   default = [
     {
@@ -76,7 +76,7 @@ variable "os_images" {
       offer       = "ubuntu-26_04-lts"
       sku         = "server"
       php_series  = "8.5"
-      php_version = "8.5.4-0ubuntu1.5" # Must be 8.5.11 or below
+      php_version = "8.5.4-0ubuntu1.5" # fixed resolute-security build
     },
     {
       name        = "debian-13"
@@ -85,7 +85,7 @@ variable "os_images" {
       offer       = "debian-13"
       sku         = "13-gen2"
       php_series  = "8.4"
-      php_version = "8.4.26-1~deb13u1"
+      php_version = "8.4.27-1~deb13u1"
     },
   ]
 
@@ -112,15 +112,11 @@ variable "install_apache" {
 }
 
 variable "php_version" {
-  description = "Exact package version of PHP to install and hold. Leave null to use the php_version of the selected OS image."
+  description = "Exact package version of PHP to install. Leave null to use the php_version of the selected OS image."
   type        = string
   default     = null
 }
 
-variable "php_snapshot_timestamp" {
-  description = "Debian only: snapshot.debian.org timestamp used to fetch the pinned PHP packages from trixie-proposed-updates"
-  default     = "20261010T000000Z"
-}
 
 ##############################################################################################################
 # FortiCNAPP agent settings
@@ -189,7 +185,7 @@ locals {
     local.is_debian ? ["php${local.php_series}-opcache"] : [],
     var.install_apache ? ["libapache2-mod-php${local.php_series}"] : []
   )
-  php_pinned = [for p in local.php_packages : "${p}=${local.php_version}"]
+  php_fixed = [for p in local.php_packages : "${p}=${local.php_version}"]
 
   forticnapp_config = jsonencode(merge(
     { tokens = { accesstoken = var.forticnapp_access_token } },
@@ -228,25 +224,8 @@ locals {
           $APT install apache2
           %{~endif~}
 
-          %{~if local.is_debian~}
-          # Temporary snapshot repository providing the pinned PHP build
-          echo "deb [check-valid-until=no trusted=yes] http://snapshot.debian.org/archive/debian/${var.php_snapshot_timestamp} trixie-proposed-updates main" \
-            > /etc/apt/sources.list.d/snapshot-php.list
-          $APT update
-          $APT --allow-downgrades install ${join(" ", local.php_pinned)}
-
-          # Remove the snapshot repository again and keep the pinned versions
-          rm -f /etc/apt/sources.list.d/snapshot-php.list
-          $APT update
-          apt-mark hold ${join(" ", local.php_packages)}
-          %{~else~}
-          # PHP ${local.php_series} comes from the Ubuntu archive
-          $APT --allow-downgrades install ${join(" ", local.php_pinned)}
-
-          # Refuse anything newer than 8.5.11 and keep the pinned versions
-          dpkg --compare-versions "$(dpkg-query -W -f='$${Version}' php${local.php_series}-cli)" le 8.5.11
-          apt-mark hold ${join(" ", local.php_packages)}
-          %{~endif~}
+          # Install the fixed PHP build from the distribution archive
+          $APT --allow-downgrades install ${join(" ", local.php_fixed)}
 
           %{~if var.install_apache~}
           # Serve PHP and expose the running version for quick checks
@@ -305,8 +284,6 @@ locals {
             echo "== php -v"
             php -v || true
             echo
-            echo "== holds"
-            apt-mark showhold
           } > /var/log/php-report.txt
     runcmd:
       - [ bash, -c, "/usr/local/sbin/install-php.sh > /var/log/install-php.log 2>&1" ]

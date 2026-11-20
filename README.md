@@ -18,15 +18,15 @@ Each scenario is available as a separate Terraform template per cloud. All of th
 
 - **[php2shell](php2shell)**
 
-  A VM with Apache and `mod_php` where PHP is installed and held at a vulnerable build. The version is pinned per OS image (PHP 8.5 on Ubuntu 26.04, PHP 8.4 on Debian 13) and can be overridden with `php_version`. On Debian the pinned build is fetched from `snapshot.debian.org`. A small `index.php` reports the running PHP version. A build report is written to `/var/log/php-report.txt`.
+  A VM with Apache and `mod_php` where PHP is installed at a fixed build. The fixed version is selected per OS image (PHP 8.5 on Ubuntu 26.04, PHP 8.4 on Debian 13) and can be overridden with `php_version`. On Debian the fixed build is fetched from the regular archive. A small `index.php` reports the running PHP version. A build report is written to `/var/log/php-report.txt`.
 
 - **[broccoli2shell](broccoli2shell)**
 
-  A VM with Node.js and Brotli (`libbrotli1`, `brotli`) held at affected builds, plus a small systemd service (`node2shell`) that Brotli-decompresses request bodies on `demo_port` (default 3000). Access to SSH and the demo port is limited to `admin_source_cidr`. A build report is written to `/var/log/node-report.txt`.
+  A VM with Node.js and Brotli (`libbrotli1`, `brotli`) pinned to fixed builds, plus a small systemd service (`node2shell`) that Brotli-decompresses request bodies on `demo_port` (default 3000). Access to SSH and the demo port is limited to `admin_source_cidr`. A build report is written to `/var/log/node-report.txt`.
 
 - **[cve-2026-119618](cve-2026-119618)**
 
-  A VM with Apache HTTP Server held at a build affected by CVE-2026-119618 (race condition in `mod_http2`'s `assign_headers()`, remote code execution; affects 2.4.55 through 2.4.70, fixed in 2.4.71). The version is pinned per OS image (Apache 2.4.69 on Debian 13, Apache 2.4.66 on Ubuntu 26.04) and can be overridden with `apache_version`; the pinned build is fetched from a pre-fix snapshot of the distribution archive (`snapshot.debian.org/archive/debian-security` on Debian, `snapshot.ubuntu.com` on Ubuntu), because both distributions shipped fixes on 2026-11-12 (DSA-6620-1 and USN-9090-1). `mod_http2` is enabled and the default site serves cleartext HTTP/2 (`h2c`) on port 80, so demo requests actually traverse the vulnerable module: `curl --http2-prior-knowledge -I http://<host>/`. A small `index.html` reports the running version. A build report is written to `/var/log/apache-report.txt`.
+  A VM with Apache HTTP Server pinned to a fixed build for CVE-2026-119618 (race condition in `mod_http2`'s `assign_headers()`, remote code execution; affects 2.4.55 through 2.4.70, fixed in 2.4.71). The fixed version is selected per OS image (Apache 2.4.71 on Debian 13, Apache 2.4.66-2ubuntu2.8 on Ubuntu 26.04) and can be overridden with `apache_version`; the fixed build is fetched from the regular Debian and Ubuntu archives, because both distributions shipped fixes on 2026-11-12 (DSA-6620-1 and USN-9090-1). `mod_http2` is enabled and the default site serves cleartext HTTP/2 (`h2c`) on port 80, so demo requests actually traverse the vulnerable module: `curl --http2-prior-knowledge -I http://<host>/`. A small `index.html` reports the running version. A build report is written to `/var/log/apache-report.txt`.
 
 ### Select your cloud
 
@@ -74,7 +74,7 @@ terraform destroy
 | `forticnapp_access_token` | Agent access token, required when the agent is installed. Prefer `export TF_VAR_forticnapp_access_token=<token>` over writing it to a file |
 | `forticnapp_server_url` | FortiCNAPP server URL for your region (default `https://api.fra.lacework.net`). Empty means auto-discover |
 
-Network ranges, VM sizes, tags and the pinned package versions have defaults and are documented in `terraform.tfvars.example`.
+Network ranges, VM sizes, tags and the fixed package versions have defaults and are documented in `terraform.tfvars.example`.
 
 ## Support
 

@@ -17,8 +17,7 @@ admin_source_cidr = "203.0.113.10/32"
 os_image = "debian-13"
 
 # --- PHP / Apache (Apache is always installed) ---
-# php_version = "8.4.26-1~deb13u1"             # Optional: override the selected image's default php_version
-php_snapshot_timestamp = "20261010T000000Z"    # Debian images only
+# php_version = "8.4.27-1~deb13u1"             # Optional: override the selected image's default php_version
 
 # --- FortiCNAPP agent ---
 install_forticnapp_agent = false

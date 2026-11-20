@@ -18,7 +18,7 @@ os_image = "debian-13"
 #     offer       = "ubuntu-26_04-lts"
 #     sku         = "server"
 #     php_series  = "8.5"
-#     php_version = "8.5.4-0ubuntu1.5"   # Ubuntu: must be 8.5.11 or below
+#     php_version = "8.5.4-0ubuntu1.5"   # Ubuntu: fixed resolute-security build
 #   },
 #   {
 #     name        = "debian-13"
@@ -27,7 +27,7 @@ os_image = "debian-13"
 #     offer       = "debian-13"
 #     sku         = "13-gen2"
 #     php_series  = "8.4"
-#     php_version = "8.4.26-1~deb13u1"
+#     php_version = "8.4.27-1~deb13u1"
 #   },
 # ]
 
@@ -40,8 +40,7 @@ admin_source_cidr = "203.0.113.10/32"
 
 # --- PHP / Apache ---
 install_apache = true
-# php_version = "8.4.26-1~deb13u1"   # Optional: override the selected image's default php_version
-php_snapshot_timestamp = "20261010T000000Z"   # Debian images only
+# php_version = "8.4.27-1~deb13u1"   # Optional: override the selected image's default php_version
 
 # --- FortiCNAPP agent ---
 install_forticnapp_agent = false
