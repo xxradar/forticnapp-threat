@@ -189,12 +189,56 @@ variable "tags" {
   }
 }
 
+variable "owner" {
+  description = "Owner of this intentionally vulnerable demo host (lowercase letters, digits, underscores or hyphens)"
+  type        = string
+
+  validation {
+    condition     = trimspace(var.owner) != "" && can(regex("^[a-z0-9_-]+$", var.owner))
+    error_message = "owner must be non-empty and contain only lowercase letters, digits, '_' or '-'."
+  }
+}
+
+variable "expires_on" {
+  description = "Expiry date for this demo host (YYYY-MM-DD)"
+  type        = string
+
+  validation {
+    condition     = can(regex("^\\d{4}-\\d{2}-\\d{2}$", var.expires_on)) && can(timeadd("${var.expires_on}T00:00:00Z", "0h"))
+    error_message = "expires_on must be a valid date in YYYY-MM-DD format."
+  }
+}
+
+check "expires_on_window" {
+  assert {
+    condition = (
+      var.expires_on >= formatdate("YYYY-MM-DD", timestamp()) &&
+      var.expires_on <= formatdate("YYYY-MM-DD", timeadd(timestamp(), "336h"))
+    )
+    error_message = "expires_on should be between today and 14 days from today."
+  }
+}
+
 ##############################################################################################################
 # Cloud-init
 ##############################################################################################################
 
 locals {
   image = one([for i in var.os_images : i if i.name == var.os_image])
+
+  scenario = "broccoli2shell"
+  vm_name  = "${lower(var.prefix)}-${local.scenario}-vm"
+
+  mandatory_tags = {
+    purpose    = "intentionally-vulnerable-demo"
+    scenario   = local.scenario
+    cves       = "cve-2026-111497"
+    owner      = var.owner
+    expires_on = var.expires_on
+    managed_by = "terraform"
+    repo       = "xxradar-forticnapp-threat"
+  }
+  all_tags = merge(var.tags, local.mandatory_tags)
 
   node_version       = coalesce(var.node_version, local.image.node_version)
   brotli_version     = coalesce(var.brotli_version, local.image.brotli_version)
@@ -210,13 +254,17 @@ locals {
   ]
 
   forticnapp_config = jsonencode(merge(
-    { tokens = { accesstoken = var.forticnapp_access_token } },
+    {
+      tokens = { accesstoken = var.forticnapp_access_token }
+      tags   = local.mandatory_tags
+    },
     var.forticnapp_server_url != "" ? { serverurl = var.forticnapp_server_url } : {}
   ))
 
   customdata = <<-EOT
     #cloud-config
-    fqdn: ${lower(var.prefix)}-node-vm
+    hostname: ${local.vm_name}
+    fqdn: ${local.vm_name}
     package_update: false
     package_upgrade: false
     write_files:
@@ -394,7 +442,7 @@ locals {
 resource "azurerm_resource_group" "resourcegroup" {
   name     = "${var.prefix}-rg"
   location = var.location
-  tags     = var.tags
+  tags     = local.all_tags
 }
 
 resource "azurerm_virtual_network" "vnet" {
@@ -402,7 +450,7 @@ resource "azurerm_virtual_network" "vnet" {
   address_space       = [var.vnet]
   location            = azurerm_resource_group.resourcegroup.location
   resource_group_name = azurerm_resource_group.resourcegroup.name
-  tags                = var.tags
+  tags                = local.all_tags
 }
 
 resource "azurerm_subnet" "subnet" {
@@ -420,7 +468,7 @@ resource "azurerm_network_security_group" "lnxnsg" {
   name                = "${var.prefix}-lnx-nsg"
   location            = var.location
   resource_group_name = azurerm_resource_group.resourcegroup.name
-  tags                = var.tags
+  tags                = local.all_tags
 }
 
 resource "azurerm_network_security_rule" "lnxnsgallowsshin" {
@@ -458,7 +506,7 @@ resource "azurerm_public_ip" "lnxpip" {
   allocation_method   = "Static"
   sku                 = "Standard"
   domain_name_label   = format("%s-%s", lower(var.prefix), "lnx-pip")
-  tags                = var.tags
+  tags                = local.all_tags
 }
 
 resource "azurerm_network_interface" "lnxifc" {
@@ -466,7 +514,7 @@ resource "azurerm_network_interface" "lnxifc" {
   location                       = azurerm_resource_group.resourcegroup.location
   resource_group_name            = azurerm_resource_group.resourcegroup.name
   accelerated_networking_enabled = false
-  tags                           = var.tags
+  tags                           = local.all_tags
 
   ip_configuration {
     name                          = "ipconfig1"
@@ -482,7 +530,7 @@ resource "azurerm_network_interface_security_group_association" "lnxnsg" {
 }
 
 resource "azurerm_linux_virtual_machine" "lnxvm" {
-  name                  = "${var.prefix}-lnx-vm"
+  name                  = local.vm_name
   location              = azurerm_resource_group.resourcegroup.location
   resource_group_name   = azurerm_resource_group.resourcegroup.name
   network_interface_ids = [azurerm_network_interface.lnxifc.id]
@@ -514,7 +562,7 @@ resource "azurerm_linux_virtual_machine" "lnxvm" {
     public_key = file(pathexpand(var.ssh_public_key_file))
   }
 
-  tags = var.tags
+  tags = local.all_tags
 
   lifecycle {
     precondition {
@@ -566,4 +614,12 @@ output "demo_url" {
 output "verify_command" {
   description = "Read the build report left by the cloud-init script (available once cloud-init has finished)"
   value       = "ssh ${var.username}@${azurerm_public_ip.lnxpip.fqdn} 'cat /var/log/node-report.txt'"
+}
+
+output "applied_tags" {
+  description = "Applied tags together with the public IP"
+  value = {
+    public_ip = azurerm_public_ip.lnxpip.ip_address
+    tags      = local.all_tags
+  }
 }

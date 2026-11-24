@@ -5,6 +5,8 @@ prefix              = "php2shell"                              # Name prefix add
 subscription_id     = "00000000-0000-0000-0000-000000000000"   # Azure subscription ID
 ssh_public_key_file = "~/.ssh/id_rsa.pub"
 
+owner      = "demo-owner"   # Required: finding owner (lowercase letters, digits, underscores or hyphens)
+expires_on = "2026-12-01"   # Required: expiry date (YYYY-MM-DD); check block warns if outside 0-14 days
 # --- OS image: select which entry of os_images to deploy ---
 # Default list: "ubuntu-26.04" (PHP 8.5) or "debian-13" (PHP 8.4)
 os_image = "debian-13"
@@ -56,5 +58,6 @@ subnet  = "172.16.140.0/25"
 vm_size = "Standard_B2s"
 
 tags = {
+  # Optional extra tags: added to mandatory tags, not replacing them.
   project = "php-vm"
 }

@@ -76,6 +76,27 @@ terraform destroy
 
 Network ranges, VM sizes, tags and the pinned package versions have defaults and are documented in `terraform.tfvars.example`.
 
+## Tagging and routing
+
+Every template now applies mandatory metadata for FortiCNAPP routing and lifecycle control on all clouds. User-provided `tags`/`labels` are merged in and can add extra metadata, but cannot remove mandatory keys.
+
+Mandatory keys:
+
+- `purpose = intentionally-vulnerable-demo`
+- `scenario = <scenario>` (`php2shell`, `broccoli2shell`, `cve-2026-119618`)
+- `cves = <scenario CVEs>` (label-safe, lowercase, underscore-separated when multiple CVEs)
+- `owner = <required>`
+- `expires_on = <required YYYY-MM-DD>`
+- `managed_by = terraform`
+- `repo = xxradar-forticnapp-threat`
+
+Suggested FortiCNAPP setup:
+
+- Resource group filter: AWS/GCP machine tag `purpose = intentionally-vulnerable-demo`
+- Alert routing rule: route findings from that group to `owner` (tag value) instead of the catch-all group
+
+This metadata is applied to cloud resource tags/labels and to FortiCNAPP agent `config.json` (`tags`) when `install_forticnapp_agent = true`.
+
 ## Support
 
 Fortinet-provided scripts and templates in this repository are not officially supported by Fortinet Technical Support. They are provided as-is, without any warranty. Use the [issue tracker](https://github.com/40net-cloud/forticnapp-threat/issues) to report problems or request improvements.
