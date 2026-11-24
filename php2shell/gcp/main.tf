@@ -163,6 +163,36 @@ variable "labels" {
   }
 }
 
+variable "owner" {
+  description = "Owner of this intentionally vulnerable demo host (lowercase letters, digits, underscores or hyphens)"
+  type        = string
+
+  validation {
+    condition     = trimspace(var.owner) != "" && can(regex("^[a-z0-9_-]+$", var.owner))
+    error_message = "owner must be non-empty and contain only lowercase letters, digits, '_' or '-'."
+  }
+}
+
+variable "expires_on" {
+  description = "Expiry date for this demo host (YYYY-MM-DD)"
+  type        = string
+
+  validation {
+    condition     = can(regex("^\\d{4}-\\d{2}-\\d{2}$", var.expires_on)) && can(timeadd("${var.expires_on}T00:00:00Z", "0h"))
+    error_message = "expires_on must be a valid date in YYYY-MM-DD format."
+  }
+}
+
+check "expires_on_window" {
+  assert {
+    condition = (
+      var.expires_on >= formatdate("YYYY-MM-DD", timestamp()) &&
+      var.expires_on <= formatdate("YYYY-MM-DD", timeadd(timestamp(), "336h"))
+    )
+    error_message = "expires_on should be between today and 14 days from today."
+  }
+}
+
 ##############################################################################################################
 # Startup script
 # The startup script metadata is used instead of cloud-init so that Debian and Ubuntu images are handled the same way.
@@ -170,6 +200,20 @@ variable "labels" {
 
 locals {
   image = one([for i in var.os_images : i if i.name == var.os_image])
+
+  scenario = "php2shell"
+  vm_name  = "${lower(var.prefix)}-${local.scenario}-vm"
+
+  mandatory_tags = {
+    purpose    = "intentionally-vulnerable-demo"
+    scenario   = local.scenario
+    cves       = "cve-2026-109618_cve-2026-109619"
+    owner      = var.owner
+    expires_on = var.expires_on
+    managed_by = "terraform"
+    repo       = "xxradar-forticnapp-threat"
+  }
+  all_tags = merge(var.labels, local.mandatory_tags)
 
   is_debian   = local.image.family == "debian"
   php_series  = local.image.php_series
@@ -184,7 +228,10 @@ locals {
   php_pinned = [for p in local.php_packages : "${p}=${local.php_version}"]
 
   forticnapp_config = jsonencode(merge(
-    { tokens = { accesstoken = var.forticnapp_access_token } },
+    {
+      tokens = { accesstoken = var.forticnapp_access_token }
+      tags   = local.mandatory_tags
+    },
     var.forticnapp_server_url != "" ? { serverurl = var.forticnapp_server_url } : {}
   ))
 
@@ -244,6 +291,8 @@ locals {
 
     # The startup script runs at every boot, only install once
     [ -f /var/lib/install-php.done ] && exit 0
+
+    hostnamectl set-hostname ${local.vm_name}
 
     export DEBIAN_FRONTEND=noninteractive
     APT="apt-get -y -o DPkg::Lock::Timeout=300"
@@ -356,11 +405,11 @@ resource "google_compute_address" "lnxpip" {
 }
 
 resource "google_compute_instance" "lnxvm" {
-  name         = "${var.prefix}-lnx-vm"
+  name         = local.vm_name
   machine_type = var.machine_type
   zone         = var.zone
   tags         = ["${var.prefix}-lnx"]
-  labels       = var.labels
+  labels       = local.all_tags
 
   boot_disk {
     initialize_params {
@@ -434,4 +483,12 @@ output "verify_command" {
 
 output "forticnapp_agent_installed" {
   value = var.install_forticnapp_agent
+}
+
+output "applied_labels" {
+  description = "Applied labels together with the public IP"
+  value = {
+    public_ip = google_compute_address.lnxpip.address
+    labels    = local.all_tags
+  }
 }

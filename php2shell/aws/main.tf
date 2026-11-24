@@ -24,7 +24,7 @@ provider "aws" {
   region = var.region
 
   default_tags {
-    tags = var.tags
+    tags = local.all_tags
   }
 }
 
@@ -138,6 +138,36 @@ variable "tags" {
   }
 }
 
+variable "owner" {
+  description = "Owner of this intentionally vulnerable demo host (lowercase letters, digits, underscores or hyphens)"
+  type        = string
+
+  validation {
+    condition     = trimspace(var.owner) != "" && can(regex("^[a-z0-9_-]+$", var.owner))
+    error_message = "owner must be non-empty and contain only lowercase letters, digits, '_' or '-'."
+  }
+}
+
+variable "expires_on" {
+  description = "Expiry date for this demo host (YYYY-MM-DD)"
+  type        = string
+
+  validation {
+    condition     = can(regex("^\\d{4}-\\d{2}-\\d{2}$", var.expires_on)) && can(timeadd("${var.expires_on}T00:00:00Z", "0h"))
+    error_message = "expires_on must be a valid date in YYYY-MM-DD format."
+  }
+}
+
+check "expires_on_window" {
+  assert {
+    condition = (
+      var.expires_on >= formatdate("YYYY-MM-DD", timestamp()) &&
+      var.expires_on <= formatdate("YYYY-MM-DD", timeadd(timestamp(), "336h"))
+    )
+    error_message = "expires_on should be between today and 14 days from today."
+  }
+}
+
 ##############################################################################################################
 # FortiCNAPP agent settings
 ##############################################################################################################
@@ -201,6 +231,20 @@ locals {
 locals {
   image = one([for i in var.os_images : i if i.name == var.os_image])
 
+  scenario = "php2shell"
+  vm_name  = "${lower(var.prefix)}-${local.scenario}-vm"
+
+  mandatory_tags = {
+    purpose    = "intentionally-vulnerable-demo"
+    scenario   = local.scenario
+    cves       = "cve-2026-109618_cve-2026-109619"
+    owner      = var.owner
+    expires_on = var.expires_on
+    managed_by = "terraform"
+    repo       = "xxradar-forticnapp-threat"
+  }
+  all_tags = merge(var.tags, local.mandatory_tags)
+
   is_debian   = local.image.family == "debian"
   php_series  = local.image.php_series
   php_version = coalesce(var.php_version, local.image.php_version)
@@ -214,13 +258,17 @@ locals {
   php_pinned = [for p in local.php_packages : "${p}=${local.php_version}"]
 
   forticnapp_config = jsonencode(merge(
-    { tokens = { accesstoken = var.forticnapp_access_token } },
+    {
+      tokens = { accesstoken = var.forticnapp_access_token }
+      tags   = local.mandatory_tags
+    },
     var.forticnapp_server_url != "" ? { serverurl = var.forticnapp_server_url } : {}
   ))
 
   customdata = <<-EOT
     #cloud-config
-    fqdn: ${lower(var.prefix)}-php-vm
+    hostname: ${local.vm_name}
+    fqdn: ${local.vm_name}
     package_update: false
     package_upgrade: false
     write_files:
@@ -458,7 +506,7 @@ resource "aws_instance" "lnxvm" {
   }
 
   tags = {
-    Name = "${var.prefix}-lnx-vm"
+    Name = local.vm_name
   }
 
   lifecycle {
@@ -511,4 +559,12 @@ output "verify_command" {
 
 output "forticnapp_agent_installed" {
   value = var.install_forticnapp_agent
+}
+
+output "applied_tags" {
+  description = "Applied tags together with the public IP"
+  value = {
+    public_ip = aws_eip.lnxpip.public_ip
+    tags      = local.all_tags
+  }
 }

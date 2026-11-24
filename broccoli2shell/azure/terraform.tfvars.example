@@ -4,6 +4,8 @@
 prefix          = "node2shell"                              # Name prefix added to each resource
 subscription_id = "00000000-0000-0000-0000-000000000000"   # Azure subscription ID
 
+owner      = "demo-owner"   # Required: finding owner (lowercase letters, digits, underscores or hyphens)
+expires_on = "2026-12-01"   # Required: expiry date (YYYY-MM-DD); check block warns if outside 0-14 days
 # --- General ---
 location            = "westeurope"
 username            = "azureuser"
@@ -35,5 +37,6 @@ subnet  = "172.16.140.0/25"
 vm_size = "Standard_B2s"
 
 tags = {
+  # Optional extra tags: added to mandatory tags, not replacing them.
   project = "node-vm"
 }

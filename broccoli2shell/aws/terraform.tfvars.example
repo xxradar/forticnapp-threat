@@ -5,6 +5,8 @@ prefix   = "node2shell"          # Name prefix added to each resource
 region   = "eu-west-1"          # AWS region
 key_name = "my-ec2-keypair"     # Existing EC2 key pair (SSH login user: ubuntu or admin, depending on os_image)
 
+owner      = "demo-owner"   # Required: finding owner (lowercase letters, digits, underscores or hyphens)
+expires_on = "2026-12-01"   # Required: expiry date (YYYY-MM-DD); check block warns if outside 0-14 days
 # --- Access ---
 # Restrict SSH to your own public IP, e.g. "203.0.113.10/32", "*", ...
 admin_source_cidr = "*"
@@ -33,5 +35,6 @@ instance_type = "t3.small"      # Use e.g. "t4g.small" together with arch = "arm
 arch          = "x86_64"        # "x86_64" or "arm64"; must match instance_type
 
 tags = {
+  # Optional extra tags: added to mandatory tags, not replacing them.
   project = "node-vm"
 }
