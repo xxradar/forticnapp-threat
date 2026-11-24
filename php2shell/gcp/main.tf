@@ -485,10 +485,10 @@ output "forticnapp_agent_installed" {
   value = var.install_forticnapp_agent
 }
 
-output "applied_labels" {
-  description = "Applied labels together with the public IP"
+output "applied_tags" {
+  description = "Applied tags/labels together with the public IP"
   value = {
     public_ip = google_compute_address.lnxpip.address
-    labels    = local.all_tags
+    tags      = local.all_tags
   }
 }
